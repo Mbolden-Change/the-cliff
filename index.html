@@ -5,6 +5,11 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>The Cliff — stories by mBOLDen Change</title>
 <meta name="description" content="Five stories from California's benefits cliff — working more and having less, told with the actual rules.">
+<meta name="theme-color" content="#FBF5E9">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="The Cliff">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Nunito+Sans:wght@400;600;700;800&display=swap" rel="stylesheet">
@@ -238,7 +243,7 @@ canvas{display:block; width:100%; height:auto;}
 </style>
 </head>
 <body>
-<button class="sound-btn" id="snd" onclick="Game.toggleSound()">SOUND ON</button>
+<button class="sound-btn" id="tts" onclick="Game.toggleRead()" aria-pressed="false">READ ALOUD: OFF</button>
 
 <div class="wrap">
 
@@ -1462,44 +1467,28 @@ const STORIES = {
   }
 };
 
-/* ================= AUDIO ================= */
-let sndOn = true, actx = null;
-function tone(freq, dur, type, vol, when){
-  if(!sndOn) return;
+/* ================= READ ALOUD (accessibility) ================= */
+let ttsOn = false;
+function stripTags(t){ return String(t).replace(/<[^>]+>/g, ''); }
+function speak(txt){
+  if(!ttsOn || !window.speechSynthesis) return;
   try{
-    actx = actx || new (window.AudioContext||window.webkitAudioContext)();
-    if(actx.state === 'suspended') actx.resume();
-    const o = actx.createOscillator(), g = actx.createGain();
-    o.type = type||'sine'; o.frequency.value = freq;
-    o.connect(g); g.connect(actx.destination);
-    const t = actx.currentTime + (when||0);
-    g.gain.setValueAtTime(Math.min(0.5, (vol||0.035)*6), t);
-    g.gain.exponentialRampToValueAtTime(0.001, t+(dur||0.1));
-    o.start(t); o.stop(t+(dur||0.1)+0.02);
+    speechSynthesis.cancel();
+    const u = new SpeechSynthesisUtterance(stripTags(txt));
+    u.rate = 0.97;
+    speechSynthesis.speak(u);
   }catch(e){}
 }
-const sfx = {
-  click:()=>tone(420,.06,'sine',.03),
-  page:()=>{tone(300,.08,'triangle',.03); tone(430,.1,'triangle',.025,.05);},
-  coin:()=>{tone(660,.08,'sine',.04); tone(990,.1,'sine',.035,.06);},
-  hit:()=>{tone(170,.15,'sawtooth',.035); tone(130,.17,'sawtooth',.03,.06);},
-  win:()=>{[440,554,659,880].forEach((f,i)=>tone(f,.14,'sine',.045,i*.09));},
-  lose:()=>{[392,330,277,220].forEach((f,i)=>tone(f,.14,'sine',.04,i*.1));}
-};
-/* gentle ambient music loop — pentatonic lullaby, starts on first tap */
-let musicTimer = null, mi = 0;
-const MELODY = [262,330,392,440,392,523,440,330,294,392,440,349,330,262];
-function startMusic(){
-  if(musicTimer || !sndOn) return;
-  musicTimer = setInterval(()=>{
-    if(!sndOn) return;
-    const f = MELODY[mi++ % MELODY.length];
-    tone(f, 1.7, 'triangle', .016);
-    tone(f/2, 2.0, 'sine', .011);
-    if(mi % 4 === 0) tone(f*1.5, 1.4, 'sine', .008, .4);
-  }, 1150);
+function toggleRead(){
+  ttsOn = !ttsOn;
+  const b = el('tts');
+  b.textContent = 'READ ALOUD: ' + (ttsOn ? 'ON' : 'OFF');
+  b.setAttribute('aria-pressed', ttsOn);
+  if(ttsOn){ speak('Read aloud is on. Story text will be spoken as you play.'); }
+  else if(window.speechSynthesis){ speechSynthesis.cancel(); }
 }
-function stopMusic(){ clearInterval(musicTimer); musicTimer = null; }
+/* silent stubs — sound effects removed */
+const sfx = { click(){}, page(){}, coin(){}, hit(){}, win(){}, lose(){} };
 
 /* ================= HELPERS ================= */
 function el(id){ return document.getElementById(id); }
@@ -1569,7 +1558,6 @@ function renderHome(){
 const S = { story:null, scene:0 };
 function playStory(key){
   S.story = key; S.scene = 0;
-  startMusic();
   show('s-scenes'); renderScene();
 }
 function renderScene(){
@@ -1580,6 +1568,7 @@ function renderScene(){
   void stage.offsetWidth;
   stage.innerHTML = SCENES[sc.svg];
   cap.textContent = sc.cap;
+  speak(sc.cap);
   stage.classList.add('stage-fade'); cap.classList.add('stage-fade');
   const dots = el('scene-dots'); dots.innerHTML = '';
   st.scenes.forEach((_,i)=>{
@@ -1610,6 +1599,7 @@ function startVignette(){
   el('vg-kicker').textContent = v.kicker;
   el('vg-title').textContent = v.title;
   el('vg-body').textContent = v.body;
+  speak(v.title + ' ' + v.body);
   el('vg-chip').textContent = v.chip;
   const btns = el('vg-btns'); btns.innerHTML = '';
   if(v.mode === 'gi'){
@@ -1668,6 +1658,7 @@ function vigRevealGI(blended){
       el('vg-end-h').textContent = v.endH;
       el('vg-end-p').textContent = v.endP;
       el('vg-punch').style.display = 'block';
+      speak(v.endH + ' ' + v.endP);
       window.scrollTo({top:document.body.scrollHeight, behavior:'smooth'});
     }, 1300);
   }, 300*items.length+500);
@@ -1709,6 +1700,7 @@ function vigReveal(){
       el('vg-end-h').textContent = v.endH;
       el('vg-end-p').textContent = v.endP;
       el('vg-punch').style.display = 'block';
+      speak(v.endH + ' ' + v.endP);
       window.scrollTo({top:document.body.scrollHeight, behavior:'smooth'});
     }, 1200);
   }, 300*items.length+500);
@@ -1823,6 +1815,7 @@ function afterLedger(ev){
     el('ev-title').textContent = ev.t;
     el('ev-body').innerHTML = ev.b + (ev.choice ? '' :
       ' <b class="'+(ev.delta<0?'neg':'pos')+'">('+signed(ev.delta)+')</b>');
+    speak(ev.t + '. ' + ev.b + (ev.choice ? '' : ' ' + signed(ev.delta) + '.'));
     const btns = el('ev-btns'); btns.innerHTML = '';
     if(ev.choice){
       ev.choice.forEach((c)=>{
@@ -1872,6 +1865,7 @@ function maybeOffer(){
     el('of-yes').textContent = R.yes; el('of-no').textContent = R.no;
     const op = el('offer-panel');
     op.style.display = 'block'; op.classList.remove('pop'); void op.offsetWidth; op.classList.add('pop');
+    speak(R.t + '. ' + R.b + ' ' + R.chip + '. Take it, or pass?');
     sfx.coin();
   } else {
     showNext();
@@ -1981,6 +1975,7 @@ function reveal(){
   }
   el('end-h').textContent = h; el('end-p1').textContent = p1; el('end-p2').textContent = p2;
   el('rate-d').textContent = rd;
+  speak(h + ' ' + p1 + ' ' + p2);
 
   el('share-pre').textContent =
     'THE CLIFF — Maya’s year\n' +
@@ -2044,11 +2039,7 @@ function copyShare(){
       ta.select(); document.execCommand('copy'); ta.remove();
       el('btn-copy').textContent='Copied'; setTimeout(()=>el('btn-copy').textContent='Copy',1500); });
 }
-function toggleSound(){
-  sndOn = !sndOn;
-  el('snd').textContent = sndOn ? 'SOUND ON' : 'SOUND OFF';
-  if(sndOn){ startMusic(); } else { stopMusic(); }
-}
+
 
 renderHome();
 
@@ -2113,7 +2104,10 @@ renderHome();
   requestAnimationFrame(frame);
 })();
 
-window.Game = { playStory, nextScene, skipIntro, goHome, nextMonth, answerRaise, closeSys, copyShare, toggleSound };
+if ('serviceWorker' in navigator && location.protocol === 'https:') {
+  navigator.serviceWorker.register('./sw.js').catch(function(){});
+}
+window.Game = { playStory, nextScene, skipIntro, goHome, nextMonth, answerRaise, closeSys, copyShare, toggleRead };
 })();
 </script>
 </body>
