@@ -1468,14 +1468,41 @@ const STORIES = {
 };
 
 /* ================= READ ALOUD (accessibility) ================= */
-let ttsOn = false;
+let ttsOn = false, ttsVoice = null;
 function stripTags(t){ return String(t).replace(/<[^>]+>/g, ''); }
+function pickVoice(){
+  if(!window.speechSynthesis) return null;
+  const voices = speechSynthesis.getVoices();
+  if(!voices.length) return null;
+  // rank voices: modern natural voices first, robotic legacy defaults last
+  const score = v => {
+    let s = 0;
+    const n = v.name.toLowerCase();
+    if(!/^en/.test(v.lang)) return -100;
+    if(/en-US/i.test(v.lang)) s += 4;
+    if(/natural|neural|premium|enhanced/.test(n)) s += 20;
+    if(/samantha|ava|allison|aria|jenny|zoe|nicky/.test(n)) s += 12;
+    if(/google/.test(n)) s += 8;
+    if(/siri/.test(n)) s += 8;
+    if(v.localService) s += 1;
+    if(/compact|albert|bad news|bells|boing|zarvox|trinoids|whisper|fred/.test(n)) s -= 30;
+    return s;
+  };
+  return voices.slice().sort((a,b) => score(b) - score(a))[0] || null;
+}
+if(window.speechSynthesis){
+  speechSynthesis.onvoiceschanged = () => { ttsVoice = pickVoice(); };
+  ttsVoice = pickVoice();
+}
 function speak(txt){
   if(!ttsOn || !window.speechSynthesis) return;
   try{
     speechSynthesis.cancel();
     const u = new SpeechSynthesisUtterance(stripTags(txt));
-    u.rate = 0.97;
+    if(!ttsVoice) ttsVoice = pickVoice();
+    if(ttsVoice) u.voice = ttsVoice;
+    u.rate = 0.95;
+    u.pitch = 1;
     speechSynthesis.speak(u);
   }catch(e){}
 }
