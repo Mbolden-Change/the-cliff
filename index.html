@@ -200,6 +200,13 @@ canvas{display:block; width:100%; height:auto;}
 .home-link{background:none; border:0; color:var(--dim); font-weight:800; font-size:12.5px; letter-spacing:.14em;
   text-transform:uppercase; cursor:pointer; margin-top:34px;}
 .home-link:hover{color:var(--sub);}
+.install-card{margin:20px auto 0; max-width:440px; background:var(--card); border:1.5px solid var(--line);
+  border-radius:16px; padding:16px 20px; text-align:center;
+  box-shadow:0 2px 0 rgba(51,41,31,.05), 0 12px 30px -18px rgba(51,41,31,.25);}
+.install-card .ic-title{font-family:'Fraunces',Georgia,serif; font-weight:700; font-size:17px; margin-bottom:6px;}
+.install-card .ic-body{font-size:14px; color:var(--sub); line-height:1.5;}
+.install-card .ic-body b{color:var(--ink);}
+.install-card .btn{margin-top:10px;}
 /* ---------- SVG scene animations ---------- */
 .kb{animation:kb 22s ease-in-out infinite alternate; transform-origin:50% 60%;}
 @keyframes kb{from{transform:scale(1);} to{transform:scale(1.055) translateY(-4px);}}
@@ -286,6 +293,10 @@ canvas{display:block; width:100%; height:auto;}
     <p class="pick">Pick a story to begin ↓</p>
   </div>
   <div id="story-cards"></div>
+  <div id="install-note" class="install-card" style="display:none">
+    <div class="ic-title">📲 Play offline, anytime</div>
+    <div class="ic-body" id="install-body"></div>
+  </div>
   <p style="text-align:center; color:var(--dim); font-size:12.5px; margin-top:22px; line-height:1.5">
     mBOLDen Change is a 501(c)(3) nonprofit organization.<br>
     Learn more at <a href="https://www.mboldenchange.org/" target="_blank" rel="noopener" style="color:var(--teal); font-weight:700">mboldenchange.org</a>
@@ -2134,6 +2145,40 @@ renderHome();
 if ('serviceWorker' in navigator && location.protocol === 'https:') {
   navigator.serviceWorker.register('./sw.js').catch(function(){});
 }
+
+/* ---- install / add-to-home-screen note ---- */
+let deferredInstall = null;
+function isStandalone(){
+  return (window.matchMedia && matchMedia('(display-mode: standalone)').matches) || navigator.standalone === true;
+}
+function showInstall(kind){
+  if(isStandalone()) return;
+  const note = el('install-note'), body = el('install-body');
+  if(!note) return;
+  if(kind === 'button'){
+    body.innerHTML = 'Add The Cliff to your device — it opens like an app and works with no internet.<br>';
+    const b = document.createElement('button');
+    b.className = 'btn sm teal'; b.textContent = 'Install the game';
+    b.onclick = () => { if(deferredInstall){ deferredInstall.prompt(); deferredInstall = null; note.style.display = 'none'; } };
+    body.appendChild(b);
+  } else if(kind === 'ios'){
+    body.innerHTML = 'On your iPhone or iPad: tap the <b>Share</b> button <span aria-hidden="true">(the square with the arrow)</span>, scroll down, and choose <b>“Add to Home Screen.”</b> The game will open like an app — and work with no internet.';
+  } else if(kind === 'macsafari'){
+    body.innerHTML = 'In Safari: choose <b>File → Add to Dock</b> to install The Cliff as an app that works offline.';
+  }
+  note.style.display = 'block';
+}
+window.addEventListener('beforeinstallprompt', function(e){
+  e.preventDefault();
+  deferredInstall = e;
+  showInstall('button');
+});
+(function(){
+  if(isStandalone()) return;
+  const ua = navigator.userAgent;
+  if(/iphone|ipad|ipod/i.test(ua)) showInstall('ios');
+  else if(/macintosh/i.test(ua) && /safari/i.test(ua) && !/chrome|chromium|edg/i.test(ua)) showInstall('macsafari');
+})();
 window.Game = { playStory, nextScene, skipIntro, goHome, nextMonth, answerRaise, closeSys, copyShare, toggleRead };
 })();
 </script>
